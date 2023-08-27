@@ -1,8 +1,11 @@
 // A simple stress test to use as much free memory available as possible.
 // Load factor should be 1.00 if buffers and buckets are allocated correctly.
 
-var HashTable = require('./index.js');
-var Node = { crypto: require('crypto'), os: require('os') };
+import HashTable from './index.js';
+import Crypto from 'node:crypto';
+import Os from 'node:os';
+
+var Node = { crypto: Crypto, os: Os };
 
 var size = Math.round(Node.os.freemem() * 0.8);
 console.log('');

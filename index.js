@@ -1,20 +1,21 @@
-'use strict';
+import { Buffer, kMaxLength } from 'node:buffer';
+import { randomBytes } from 'node:crypto';
 
 var Assert = {};
 
-Assert.GE = function(key, value, bound) {
+Assert.GE = function (key, value, bound) {
   if (!Number.isInteger(value)) throw new Error(key + ' must be an integer');
   if (!Number.isInteger(bound)) throw new Error(key + ' bound not an integer');
   if (value < bound) throw new Error(key + ' must be at least ' + bound);
 };
 
-Assert.LE = function(key, value, bound) {
+Assert.LE = function (key, value, bound) {
   if (!Number.isInteger(value)) throw new Error(key + ' must be an integer');
   if (!Number.isInteger(bound)) throw new Error(key + ' bound not an integer');
   if (value > bound) throw new Error(key + ' must be at most ' + bound);
 };
 
-Assert.P2 = function(key, value) {
+Assert.P2 = function (key, value) {
   if (!Number.isInteger(value)) throw new Error(key + ' must be an integer');
   if (value <= 0) throw new Error(key + ' must be greater than 0');
   if (value & (value - 1)) throw new Error(key + ' must be a power of 2');
@@ -55,7 +56,7 @@ function Hash(key, keyOffset, keySize) {
 
 // Slot lookup table, given 8-bits, return the index of an empty slot (if any):
 // We use this to find an empty slot in a single branch.
-var SLOT = (function() {
+var SLOT = (function () {
   var slots = 8;
   var table = new Uint8Array(1 << slots);
   for (var index = 0; index < table.length; index++) {
@@ -68,10 +69,10 @@ var SLOT = (function() {
 })();
 
 // Interleaved entropy table used by tabulation hash function:
-var TABLE = (function() {
+var TABLE = (function () {
   var word = 4;
   var table = new Int32Array(64 * 256 * 2);
-  var buffer = require('crypto').randomBytes(table.length * word);
+  var buffer = randomBytes(table.length * word);
   for (var index = 0, length = table.length; index < length; index++) {
     table[index] = buffer.readInt32LE(index * word);
   }
@@ -81,7 +82,7 @@ var TABLE = (function() {
 // A fallback for when valueSize is 0 and the user does not pass a value buffer:
 var VALUE = Buffer.alloc(0);
 
-function HashTable(keySize, valueSize, elementsMin=1024, elementsMax=0) {
+function HashTable(keySize, valueSize, elementsMin = 1024, elementsMax = 0) {
   Assert.GE('keySize', keySize, HashTable.KEY_MIN);
   Assert.LE('keySize', keySize, HashTable.KEY_MAX);
   // We optimize the hash function significantly given key is a multiple of 4:
@@ -127,7 +128,7 @@ function HashTable(keySize, valueSize, elementsMin=1024, elementsMax=0) {
   }
 }
 
-HashTable.prototype.cache = function(key, keyOffset, value, valueOffset) {
+HashTable.prototype.cache = function (key, keyOffset, value, valueOffset) {
   if (this.mode === 1) throw new Error(HashTable.ERROR_MODE);
   this.mode = 2;
   if (this.valueSize === 0) {
@@ -141,13 +142,13 @@ HashTable.prototype.cache = function(key, keyOffset, value, valueOffset) {
   return result;
 };
 
-HashTable.prototype.exist = function(key, keyOffset) {
+HashTable.prototype.exist = function (key, keyOffset) {
   Hash(key, keyOffset, this.keySize);
   var table = this.tables[(((H1 >> 24) << 8) | (H2 >> 24)) & this.mask];
   return table.exist(H1, H2, key, keyOffset);
 };
 
-HashTable.prototype.get = function(key, keyOffset, value, valueOffset) {
+HashTable.prototype.get = function (key, keyOffset, value, valueOffset) {
   if (this.valueSize === 0) {
     value = VALUE;
     valueOffset = 0;
@@ -158,12 +159,12 @@ HashTable.prototype.get = function(key, keyOffset, value, valueOffset) {
 };
 
 Object.defineProperty(HashTable.prototype, 'load', {
-  get: function() {
+  get: function () {
     return this.length / this.capacity;
   }
 });
 
-HashTable.prototype.set = function(key, keyOffset, value, valueOffset) {
+HashTable.prototype.set = function (key, keyOffset, value, valueOffset) {
   if (this.mode === 2) throw new Error(HashTable.ERROR_MODE);
   this.mode = 1;
   if (this.valueSize === 0) {
@@ -197,14 +198,14 @@ HashTable.prototype.set = function(key, keyOffset, value, valueOffset) {
 };
 
 Object.defineProperty(HashTable.prototype, 'size', {
-  get: function() {
+  get: function () {
     var size = this.capacity / 8 * this.bucket;
     Assert.GE('size', size, 0);
     return size;
   }
 });
 
-HashTable.prototype.unset = function(key, keyOffset) {
+HashTable.prototype.unset = function (key, keyOffset) {
   Hash(key, keyOffset, this.keySize);
   var table = this.tables[(((H1 >> 24) << 8) | (H2 >> 24)) & this.mask];
   var result = table.unset(H1, H2, key, keyOffset);
@@ -223,7 +224,7 @@ HashTable.ELEMENTS_MIN = 0;
 HashTable.ELEMENTS_MAX = 4294967296;
 HashTable.BUCKETS_MIN = 2;
 HashTable.BUCKETS_MAX = 65536;
-HashTable.BUFFER_MAX = require('buffer').kMaxLength;
+HashTable.BUFFER_MAX = kMaxLength;
 Assert.GE('BUFFER_MAX', HashTable.BUFFER_MAX, 0);
 Assert.LE('BUFFER_MAX', HashTable.BUFFER_MAX, Math.pow(2, 32));
 Assert.LE(
@@ -252,7 +253,7 @@ HashTable.ERROR_MODE = 'cache() and set() methods are mutually exclusive';
 HashTable.ERROR_SET = 'set() failed despite multiple resize attempts';
 
 // The size of a cache-aligned bucket, given keySize and valueSize:
-HashTable.bucket = function(keySize, valueSize) {
+HashTable.bucket = function (keySize, valueSize) {
   Assert.GE('keySize', keySize, HashTable.KEY_MIN);
   Assert.LE('keySize', keySize, HashTable.KEY_MAX);
   if (keySize % 4) throw new Error('keySize must be a multiple of 4');
@@ -265,9 +266,9 @@ HashTable.bucket = function(keySize, valueSize) {
 };
 
 // The number of buckets required to support elements at 100% load factor:
-HashTable.buckets = function(elements, buffers) {
+HashTable.buckets = function (elements, buffers) {
   Assert.GE('elements', elements, HashTable.ELEMENTS_MIN);
-  Assert.LE('elements', elements, HashTable.ELEMENTS_MAX);  
+  Assert.LE('elements', elements, HashTable.ELEMENTS_MAX);
   Assert.GE('buffers', buffers, HashTable.BUFFERS_MIN);
   Assert.LE('buffers', buffers, HashTable.BUFFERS_MAX);
   Assert.P2('buffers', buffers);
@@ -280,12 +281,12 @@ HashTable.buckets = function(elements, buffers) {
 };
 
 // The number of buffers required to support elements at 100% load factor:
-HashTable.buffers = function(keySize, valueSize, elements) {
+HashTable.buffers = function (keySize, valueSize, elements) {
   // Objectives:
   //
   // 1. Maximize the number of buckets (>= 64) for maximum load factor.
   // 2. Minimize the number of buffers for less pointer overhead.
-  //  
+  //
   // The number of buckets places an upper bound on the maximum load factor:
   // If, at maximum capacity, the number of buckets is less than 64 then the
   // maximum load factor will be less than 100% (even when evicting).
@@ -308,7 +309,7 @@ HashTable.buffers = function(keySize, valueSize, elements) {
   // A value size of 1 MB guarantees 64 buckets.
   // A value size of 2 MB guarantees 32 buckets.
   // A value size of 4 MB guarantees 16 buckets.
-  // 
+  //
   // We therefore set VALUE_MAX to 1 MB to preclude the possibility of a cache
   // ever being artificially restricted to 75% occupancy (even when evicting).
   //
@@ -344,7 +345,7 @@ HashTable.buffers = function(keySize, valueSize, elements) {
   return buffers;
 };
 
-HashTable.capacity = function(elements) {
+HashTable.capacity = function (elements) {
   Assert.GE('elements', elements, HashTable.ELEMENTS_MIN);
   Assert.LE('elements', elements, HashTable.ELEMENTS_MAX);
   var capacity = Math.min(Math.floor(elements * 1.3), HashTable.ELEMENTS_MAX);
@@ -367,7 +368,7 @@ function Table(keySize, valueSize, bucket, buckets) {
   this.SLOT = SLOT;
 }
 
-Table.prototype.assign = function(
+Table.prototype.assign = function (
   bucket,
   tag,
   slot,
@@ -387,7 +388,7 @@ Table.prototype.assign = function(
   );
 };
 
-Table.prototype.cache = function(h1, h2, key, keyOffset, value, valueOffset) {
+Table.prototype.cache = function (h1, h2, key, keyOffset, value, valueOffset) {
   // See comments in set():
   var tag = (h1 >> 16) & 255;
   var b1 = (h1 & this.mask) * this.bucket;
@@ -420,23 +421,23 @@ Table.prototype.cache = function(h1, h2, key, keyOffset, value, valueOffset) {
   return eviction ? 2 : 0;
 };
 
-Table.prototype.copy = function(size) {
+Table.prototype.copy = function (size) {
   switch (size) {
-  case   0: return this.copy00;
-  case   4: return this.copy04;
-  case   8: return this.copy08;
-  case  16: return this.copy16;
-  case  20: return this.copy20;
-  case  32: return this.copy32;
-  case  48: return this.copy48;
-  case  64: return this.copy64;
-  case 128: return this.copy128;
-  case 256: return this.copy256;
+    case 0: return this.copy00;
+    case 4: return this.copy04;
+    case 8: return this.copy08;
+    case 16: return this.copy16;
+    case 20: return this.copy20;
+    case 32: return this.copy32;
+    case 48: return this.copy48;
+    case 64: return this.copy64;
+    case 128: return this.copy128;
+    case 256: return this.copy256;
   }
   return undefined;
 };
 
-Table.prototype.copyKeyGeneric = function(s, sO, t, tO) {
+Table.prototype.copyKeyGeneric = function (s, sO, t, tO) {
   var size = this.keySize;
   var groups = size >>> 2;
   while (groups--) {
@@ -451,7 +452,7 @@ Table.prototype.copyKeyGeneric = function(s, sO, t, tO) {
   while (size--) t[tO++] = s[sO++];
 };
 
-Table.prototype.copyValueGeneric = function(s, sO, t, tO) {
+Table.prototype.copyValueGeneric = function (s, sO, t, tO) {
   var size = this.valueSize;
   if (size < 128) {
     var groups = size >>> 3;
@@ -474,37 +475,37 @@ Table.prototype.copyValueGeneric = function(s, sO, t, tO) {
   }
 };
 
-Table.prototype.copy00 = function(s, sO, t, tO) {};
+Table.prototype.copy00 = function (s, sO, t, tO) { };
 
-Table.prototype.copy04 = function(s, sO, t, tO) {
-  t[tO +  0] = s[sO +  0];
-  t[tO +  1] = s[sO +  1];
-  t[tO +  2] = s[sO +  2];
-  t[tO +  3] = s[sO +  3];
+Table.prototype.copy04 = function (s, sO, t, tO) {
+  t[tO + 0] = s[sO + 0];
+  t[tO + 1] = s[sO + 1];
+  t[tO + 2] = s[sO + 2];
+  t[tO + 3] = s[sO + 3];
 };
 
-Table.prototype.copy08 = function(s, sO, t, tO) {
-  t[tO +  0] = s[sO +  0];
-  t[tO +  1] = s[sO +  1];
-  t[tO +  2] = s[sO +  2];
-  t[tO +  3] = s[sO +  3];
-  t[tO +  4] = s[sO +  4];
-  t[tO +  5] = s[sO +  5];
-  t[tO +  6] = s[sO +  6];
-  t[tO +  7] = s[sO +  7];
+Table.prototype.copy08 = function (s, sO, t, tO) {
+  t[tO + 0] = s[sO + 0];
+  t[tO + 1] = s[sO + 1];
+  t[tO + 2] = s[sO + 2];
+  t[tO + 3] = s[sO + 3];
+  t[tO + 4] = s[sO + 4];
+  t[tO + 5] = s[sO + 5];
+  t[tO + 6] = s[sO + 6];
+  t[tO + 7] = s[sO + 7];
 };
 
-Table.prototype.copy16 = function(s, sO, t, tO) {
-  t[tO +  0] = s[sO +  0];
-  t[tO +  1] = s[sO +  1];
-  t[tO +  2] = s[sO +  2];
-  t[tO +  3] = s[sO +  3];
-  t[tO +  4] = s[sO +  4];
-  t[tO +  5] = s[sO +  5];
-  t[tO +  6] = s[sO +  6];
-  t[tO +  7] = s[sO +  7];
-  t[tO +  8] = s[sO +  8];
-  t[tO +  9] = s[sO +  9];
+Table.prototype.copy16 = function (s, sO, t, tO) {
+  t[tO + 0] = s[sO + 0];
+  t[tO + 1] = s[sO + 1];
+  t[tO + 2] = s[sO + 2];
+  t[tO + 3] = s[sO + 3];
+  t[tO + 4] = s[sO + 4];
+  t[tO + 5] = s[sO + 5];
+  t[tO + 6] = s[sO + 6];
+  t[tO + 7] = s[sO + 7];
+  t[tO + 8] = s[sO + 8];
+  t[tO + 9] = s[sO + 9];
   t[tO + 10] = s[sO + 10];
   t[tO + 11] = s[sO + 11];
   t[tO + 12] = s[sO + 12];
@@ -513,17 +514,17 @@ Table.prototype.copy16 = function(s, sO, t, tO) {
   t[tO + 15] = s[sO + 15];
 };
 
-Table.prototype.copy20 = function(s, sO, t, tO) {
-  t[tO +  0] = s[sO +  0];
-  t[tO +  1] = s[sO +  1];
-  t[tO +  2] = s[sO +  2];
-  t[tO +  3] = s[sO +  3];
-  t[tO +  4] = s[sO +  4];
-  t[tO +  5] = s[sO +  5];
-  t[tO +  6] = s[sO +  6];
-  t[tO +  7] = s[sO +  7];
-  t[tO +  8] = s[sO +  8];
-  t[tO +  9] = s[sO +  9];
+Table.prototype.copy20 = function (s, sO, t, tO) {
+  t[tO + 0] = s[sO + 0];
+  t[tO + 1] = s[sO + 1];
+  t[tO + 2] = s[sO + 2];
+  t[tO + 3] = s[sO + 3];
+  t[tO + 4] = s[sO + 4];
+  t[tO + 5] = s[sO + 5];
+  t[tO + 6] = s[sO + 6];
+  t[tO + 7] = s[sO + 7];
+  t[tO + 8] = s[sO + 8];
+  t[tO + 9] = s[sO + 9];
   t[tO + 10] = s[sO + 10];
   t[tO + 11] = s[sO + 11];
   t[tO + 12] = s[sO + 12];
@@ -536,17 +537,17 @@ Table.prototype.copy20 = function(s, sO, t, tO) {
   t[tO + 19] = s[sO + 19];
 };
 
-Table.prototype.copy32 = function(s, sO, t, tO) {
-  t[tO +  0] = s[sO +  0];
-  t[tO +  1] = s[sO +  1];
-  t[tO +  2] = s[sO +  2];
-  t[tO +  3] = s[sO +  3];
-  t[tO +  4] = s[sO +  4];
-  t[tO +  5] = s[sO +  5];
-  t[tO +  6] = s[sO +  6];
-  t[tO +  7] = s[sO +  7];
-  t[tO +  8] = s[sO +  8];
-  t[tO +  9] = s[sO +  9];
+Table.prototype.copy32 = function (s, sO, t, tO) {
+  t[tO + 0] = s[sO + 0];
+  t[tO + 1] = s[sO + 1];
+  t[tO + 2] = s[sO + 2];
+  t[tO + 3] = s[sO + 3];
+  t[tO + 4] = s[sO + 4];
+  t[tO + 5] = s[sO + 5];
+  t[tO + 6] = s[sO + 6];
+  t[tO + 7] = s[sO + 7];
+  t[tO + 8] = s[sO + 8];
+  t[tO + 9] = s[sO + 9];
   t[tO + 10] = s[sO + 10];
   t[tO + 11] = s[sO + 11];
   t[tO + 12] = s[sO + 12];
@@ -571,35 +572,35 @@ Table.prototype.copy32 = function(s, sO, t, tO) {
   t[tO + 31] = s[sO + 31];
 };
 
-Table.prototype.copy48 = function(s, sO, t, tO) {
-  this.copy32(s, sO +  0, t, tO +  0);
+Table.prototype.copy48 = function (s, sO, t, tO) {
+  this.copy32(s, sO + 0, t, tO + 0);
   this.copy16(s, sO + 32, t, tO + 32);
 };
 
-Table.prototype.copy64 = function(s, sO, t, tO) {
-  this.copy32(s, sO +  0, t, tO +  0);
+Table.prototype.copy64 = function (s, sO, t, tO) {
+  this.copy32(s, sO + 0, t, tO + 0);
   this.copy32(s, sO + 32, t, tO + 32);
 };
 
-Table.prototype.copy128 = function(s, sO, t, tO) {
-  this.copy32(s, sO +  0, t, tO +  0);
+Table.prototype.copy128 = function (s, sO, t, tO) {
+  this.copy32(s, sO + 0, t, tO + 0);
   this.copy32(s, sO + 32, t, tO + 32);
   this.copy32(s, sO + 64, t, tO + 64);
   this.copy32(s, sO + 96, t, tO + 96);
 };
 
-Table.prototype.copy256 = function(s, sO, t, tO) {
-  this.copy32(s, sO +   0, t, tO +   0);
-  this.copy32(s, sO +  32, t, tO +  32);
-  this.copy32(s, sO +  64, t, tO +  64);
-  this.copy32(s, sO +  96, t, tO +  96);
+Table.prototype.copy256 = function (s, sO, t, tO) {
+  this.copy32(s, sO + 0, t, tO + 0);
+  this.copy32(s, sO + 32, t, tO + 32);
+  this.copy32(s, sO + 64, t, tO + 64);
+  this.copy32(s, sO + 96, t, tO + 96);
   this.copy32(s, sO + 128, t, tO + 128);
   this.copy32(s, sO + 160, t, tO + 160);
   this.copy32(s, sO + 192, t, tO + 192);
   this.copy32(s, sO + 224, t, tO + 224);
 };
 
-Table.prototype.equal = function(a, aOffset, b, bOffset, size) {
+Table.prototype.equal = function (a, aOffset, b, bOffset, size) {
   while (size--) {
     if (a[aOffset++] != b[bOffset++]) return 0;
   }
@@ -607,7 +608,7 @@ Table.prototype.equal = function(a, aOffset, b, bOffset, size) {
 };
 
 // Evict an element using the CLOCK eviction policy which approximates LRU:
-Table.prototype.evict = function(bucket) {
+Table.prototype.evict = function (bucket) {
   // After the CLOCK hand wraps, we are guaranteed an eviction:
   var tick = 8 + 1;
   while (tick--) {
@@ -623,7 +624,7 @@ Table.prototype.evict = function(bucket) {
   return slot;
 };
 
-Table.prototype.exist = function(h1, h2, key, keyOffset) {
+Table.prototype.exist = function (h1, h2, key, keyOffset) {
   // See comments in set():
   var tag = (h1 >> 16) & 255;
   var b1 = (h1 & this.mask) * this.bucket;
@@ -640,7 +641,7 @@ Table.prototype.exist = function(h1, h2, key, keyOffset) {
 };
 
 // Decrement a filter's count of elements in second position:
-Table.prototype.filterDecrementSecondPosition = function(bucket) {
+Table.prototype.filterDecrementSecondPosition = function (bucket) {
   if (this.buffer[bucket + 8] === 0) throw new Error('count should not be 0');
   if (this.buffer[bucket + 8] < 255) {
     this.buffer[bucket + 8]--;
@@ -653,7 +654,7 @@ Table.prototype.filterDecrementSecondPosition = function(bucket) {
 };
 
 // Increment a filter's count of elements in second position:
-Table.prototype.filterIncrementSecondPosition = function(bucket) {
+Table.prototype.filterIncrementSecondPosition = function (bucket) {
   // Once the counter saturates, it can no longer be incremented or decremented.
   // This is extremely unlikely, we expect at most 4 elements and can count 254.
   // Even if it does saturate, the worst is that we never reset the filter.
@@ -661,7 +662,7 @@ Table.prototype.filterIncrementSecondPosition = function(bucket) {
 };
 
 // Reset a filter to remove stale entries:
-Table.prototype.filterReset = function(bucket, filter) {
+Table.prototype.filterReset = function (bucket, filter) {
   // Filter has elements in second position and cannot be reset:
   if (this.buffer[bucket + 8] !== 0) return;
   // Filter has no elements (since no bits are set):
@@ -684,7 +685,7 @@ Table.prototype.filterReset = function(bucket, filter) {
   }
 };
 
-Table.prototype.get = function(h1, h2, key, keyOffset, value, valueOffset) {
+Table.prototype.get = function (h1, h2, key, keyOffset, value, valueOffset) {
   // See comments in set():
   var tag = (h1 >> 16) & 255;
   var b1 = (h1 & this.mask) * this.bucket;
@@ -709,14 +710,14 @@ Table.prototype.get = function(h1, h2, key, keyOffset, value, valueOffset) {
   return 0;
 };
 
-Table.prototype.keyOffset = function(bucket, slot) {
+Table.prototype.keyOffset = function (bucket, slot) {
   // 20 = 8:Filter 1:FilterCount 1:Present 8:Tags 1:ClockUsed 1:ClockHand
   // We keep the element's key and value together to optimize the common case of
   // comparing the key and retrieving the value without a cache miss.
   return bucket + 20 + (this.keySize + this.valueSize) * slot;
 };
 
-Table.prototype.resize = function(resizeBuckets) {
+Table.prototype.resize = function (resizeBuckets) {
   Assert.GE('resizeBuckets', resizeBuckets, this.buckets * 2);
   Assert.P2('resizeBuckets', resizeBuckets);
   if (
@@ -752,7 +753,7 @@ Table.prototype.resize = function(resizeBuckets) {
   return 1;
 };
 
-Table.prototype.scan = function(bucket, tag, key, keyOffset) {
+Table.prototype.scan = function (bucket, tag, key, keyOffset) {
   for (var slot = 0; slot < 8; slot++) {
     if (
       // Check the tag before checking presence bits:
@@ -773,7 +774,7 @@ Table.prototype.scan = function(bucket, tag, key, keyOffset) {
   return slot;
 };
 
-Table.prototype.set = function(h1, h2, key, keyOffset, value, valueOffset) {
+Table.prototype.set = function (h1, h2, key, keyOffset, value, valueOffset) {
   // Use the 2nd most significant byte of H1 for 1-byte tag:
   var tag = (h1 >> 16) & 255;
   // Use the 3rd and 4th most significant bytes of H1 and H2 for bucket offset:
@@ -834,7 +835,7 @@ Table.prototype.set = function(h1, h2, key, keyOffset, value, valueOffset) {
   return -1;
 };
 
-Table.prototype.unset = function(h1, h2, key, keyOffset) {
+Table.prototype.unset = function (h1, h2, key, keyOffset) {
   // See comments in set():
   var tag = (h1 >> 16) & 255;
   var b1 = (h1 & this.mask) * this.bucket;
@@ -864,7 +865,7 @@ Table.prototype.unset = function(h1, h2, key, keyOffset) {
   return 0;
 };
 
-Table.prototype.vacate = function(bucket) {
+Table.prototype.vacate = function (bucket) {
   for (var slot = 0; slot < 8; slot++) {
     var keyOffset = this.keyOffset(bucket, slot);
     var valueOffset = this.valueOffset(bucket, slot);
@@ -900,12 +901,12 @@ Table.prototype.vacate = function(bucket) {
   return slot;
 };
 
-Table.prototype.valueOffset = function(bucket, slot) {
+Table.prototype.valueOffset = function (bucket, slot) {
   // See comment in keyOffset():
   return bucket + 20 + (this.keySize + this.valueSize) * slot + this.keySize;
 };
 
-Table.prototype.zero = function(offset, size) {
+Table.prototype.zero = function (offset, size) {
   if (size < 64) {
     var groups = size >>> 2;
     while (groups--) {
@@ -922,6 +923,6 @@ Table.prototype.zero = function(offset, size) {
   }
 };
 
-module.exports = HashTable;
+export default HashTable;
 
 // S.D.G.

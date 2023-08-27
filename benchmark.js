@@ -1,8 +1,10 @@
-var HashTable = require('./index.js');
+import HashTable from './index.js';
+import Crypto from 'node:crypto';
+import Os from 'node:os';
 
 var Node = {
-  crypto: require('crypto'),
-  os: require('os'),
+  crypto: Crypto,
+  os: Os,
   process: process
 };
 
@@ -23,7 +25,7 @@ function average(time, elements) {
   return Math.round(ns / elements);
 }
 
-function benchmark(keySize, valueSize) {  
+function benchmark(keySize, valueSize) {
   var results = {};
   var value = Buffer.alloc(valueSize);
   var bucket = HashTable.bucket(keySize, valueSize);
@@ -53,7 +55,7 @@ function benchmark(keySize, valueSize) {
     offset += element;
   }
   results['  set() Reserve'] = average(time, elements);
-  
+
   // Set elements which have already been inserted:
   var time = Node.process.hrtime();
   var offset = 0;
@@ -184,7 +186,7 @@ function display(keySize, valueSize, results) {
   for (var key in results) {
     var label = key.padEnd(17, ' ');
     var value = (results[key] + 'ns').padStart(16, ' ');
-    lines.push('    '  + label + value + '  ');
+    lines.push('    ' + label + value + '  ');
   }
   printColumn(lines);
 }
@@ -200,9 +202,9 @@ function printColumn(lines) {
   var maxColumn = 0;
   var maxRows = 0;
   printColumns.forEach(
-    function(lines) {
+    function (lines) {
       lines.forEach(
-        function(line) {
+        function (line) {
           if (line.length > maxColumn) maxColumn = line.length;
         }
       );
@@ -222,9 +224,9 @@ function printColumn(lines) {
 }
 
 KEY_SIZES.forEach(
-  function(keySize) {
+  function (keySize) {
     VALUE_SIZES.forEach(
-      function(valueSize) {
+      function (valueSize) {
         // Discard first result to let optimizations kick in:
         // We do this for every keySize/valueSize as these have fastpaths.
         benchmark(keySize, valueSize);

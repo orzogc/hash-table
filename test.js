@@ -1,8 +1,7 @@
-'use strict';
+import HashTable from './index.js';
+import Crypto from 'node:crypto';
 
-var HashTable = require('./index.js');
-
-var Node = { crypto: require('crypto') };
+var Node = { crypto: Crypto };
 
 function Assert(description, a, b) {
   var x = a;
@@ -37,7 +36,7 @@ var BAR_SINGLE = new Array(80 + 1).join('-');
 var KEY_RND = Node.crypto.randomBytes(8 * 1024 * 1024);
 
 // For keySizes 4, 8, 12 and 16:
-var KEY_SEQ = (function() {
+var KEY_SEQ = (function () {
   var buffer = Buffer.alloc(8 * 1024 * 1024);
   var index = 0;
   var offset = 0;
@@ -299,8 +298,8 @@ function Test(keySize, valueSize, many, cache) {
 }
 
 // Exception message constants must be strings:
-[ 'ERROR_MAXIMUM_CAPACITY_EXCEEDED', 'ERROR_MODE', 'ERROR_SET'].forEach(
-  function(key) {
+['ERROR_MAXIMUM_CAPACITY_EXCEEDED', 'ERROR_MODE', 'ERROR_SET'].forEach(
+  function (key) {
     Assert('HashTable.' + key, typeof HashTable[key], 'string');
   }
 );
@@ -319,7 +318,7 @@ function Test(keySize, valueSize, many, cache) {
   'BUCKETS_MAX',
   'BUFFER_MAX'
 ].forEach(
-  function(key) {
+  function (key) {
     Assert('HashTable.' + key, typeof HashTable[key], 'number');
     Assert('HashTable.' + key, Number.isSafeInteger(HashTable[key]), true);
     Assert('HashTable.' + key, HashTable[key] >= 0, true);
@@ -369,7 +368,7 @@ function Test(keySize, valueSize, many, cache) {
     HashTable.ERROR_MAXIMUM_CAPACITY_EXCEEDED
   ]
 ].forEach(
-  function(args) {
+  function (args) {
     Assert('args.length === 5', args.length === 5, true);
     var error;
     try {
@@ -392,7 +391,7 @@ Assert('README 4,294,967,296 elements', 4294967296, HashTable.ELEMENTS_MAX);
 Assert('README 16 TB', 17592186044416, HashTable.BUFFERS_MAX * 2147483648);
 
 // Maximum load factor must not be artificially restricted by too few buckets:
-(function() {
+(function () {
   var elements = HashTable.BUCKETS_MAX * 8;
   var keySize = HashTable.KEY_MIN;
   while (keySize <= HashTable.KEY_MAX) {
@@ -432,11 +431,11 @@ var KEY_SEQ_HASH = Hash(KEY_SEQ, 0, KEY_SEQ.length);
 var ENTROPY_HASH = Hash(ENTROPY, 0, ENTROPY.length);
 
 KEY_SIZES.forEach(
-  function(keySize) {
+  function (keySize) {
     var manyIndex = Math.floor(Math.random() * VALUE_SIZES.length);
     var cacheIndex = Math.floor(Math.random() * VALUE_SIZES.length);
     VALUE_SIZES.forEach(
-      function(valueSize, valueSizeIndex) {
+      function (valueSize, valueSizeIndex) {
         var many = valueSizeIndex === manyIndex && Math.random() < 0.5;
         var cache = valueSizeIndex === cacheIndex;
         Test(keySize, valueSize, many, cache);
